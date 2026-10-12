@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ふくしま在宅クリニック 業務管理</title>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+/* Layout: a full-bleed living sky (canvas: time-of-day gradient, Joto-ward rooftops, window lights that answer the cursor) over which
+   the hub floats as glass panels. Single committed dark-first look so the sky reads at any hour; tokens shift with the hour via JS. */
+:root{
+  --bg:#0c1222;
+  --fg:#eef1f6; --fg-muted:#aab4c4; --fg-dim:#7d8798;
+  --glass:rgba(16,24,42,.62); --glass-strong:rgba(16,24,42,.82); --line:rgba(255,255,255,.12); --line-strong:rgba(255,255,255,.28);
+  --accent:#f4c56a;        /* 灯り（窓明かりの金） */
+  --accent-2:#8fd3ff;      /* 夜明けの空 */
+  --crit:#ff8a7a; --crit-soft:rgba(255,120,100,.16);
+  --warn:#f4c56a; --warn-soft:rgba(244,197,106,.16);
+  --ok:#8be0b0;   --ok-soft:rgba(139,224,176,.16);
+  --info:#c4b3ff; --info-soft:rgba(196,179,255,.16);
+  --font-display:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --font-body:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.75;padding-inline:16px;padding-block:0 56px;position:relative;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+.wrap{position:relative;z-index:1;max-width:1080px;margin-inline:auto}
+
+/* ───── hero ───── */
+.hero{min-height:62vh;display:flex;flex-direction:column;justify-content:flex-end;padding-block:48px 36px;gap:18px}
+.eyebrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;font-size:.82rem;letter-spacing:.14em;color:var(--fg-muted)}
+.eyebrow .clock{font-family:var(--font-display);font-size:1.05rem;letter-spacing:.08em;color:var(--fg);font-variant-numeric:tabular-nums}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+.greet{font-family:var(--font-display);font-weight:800;font-size:clamp(2.1rem,5.2vw,3.6rem);line-height:1.18;letter-spacing:.02em;text-wrap:balance;margin:0;text-shadow:0 2px 30px rgba(0,0,0,.45)}
+.greet em{font-style:normal;color:var(--accent)}
+.motto{font-family:var(--font-display);font-size:clamp(1.05rem,2vw,1.35rem);font-weight:500;color:var(--fg);margin:0;max-width:34ch;text-wrap:balance;cursor:pointer;user-select:none;position:relative;padding-left:18px;border-left:2px solid var(--accent);transition:opacity .35s}
+.motto.swap{opacity:0}
+.motto small{display:block;font-family:var(--font-body);font-size:.72rem;letter-spacing:.14em;color:var(--fg-dim);margin-top:6px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.cta{display:inline-flex;align-items:center;gap:12px;padding:14px 22px;border-radius:999px;font-weight:700;font-size:1rem;background:var(--accent);color:#1a1405;box-shadow:0 10px 40px rgba(244,197,106,.28);transition:transform .25s,box-shadow .25s}
+.cta:hover{transform:translateY(-2px);box-shadow:0 16px 50px rgba(244,197,106,.42)}
+.cta .arrow{transition:transform .25s}.cta:hover .arrow{transform:translateX(4px)}
+.ghost{display:inline-flex;align-items:center;gap:10px;padding:14px 20px;border-radius:999px;border:1px solid var(--line-strong);background:var(--glass);backdrop-filter:blur(10px);font-weight:700;transition:border-color .25s,background .25s}
+.ghost:hover{border-color:var(--accent);background:var(--glass-strong)}
+
+/* ───── sections ───── */
+section{padding-block:34px 8px}
+h2{font-family:var(--font-display);font-size:1.35rem;font-weight:700;margin:0 0 16px;display:flex;align-items:baseline;gap:14px;letter-spacing:.04em}
+h2 .sub{font-family:var(--font-body);font-size:.78rem;font-weight:400;color:var(--fg-muted);letter-spacing:.08em}
+h3{font-size:.76rem;font-weight:700;color:var(--fg-dim);letter-spacing:.16em;margin:18px 0 8px}
+
+/* five tiles with tilt */
+.five{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px;perspective:1200px}
+.tile{display:flex;gap:14px;min-width:0;background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px;padding:18px 20px;transform-style:preserve-3d;transition:transform .18s ease-out,border-color .25s,box-shadow .25s;position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;inset:0;background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.14),transparent 60%);opacity:0;transition:opacity .3s;pointer-events:none}
+.tile:hover{border-color:var(--line-strong);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.tile:hover::before{opacity:1}
+.tile .num{font-family:var(--font-display);font-size:1.7rem;font-weight:800;color:var(--accent);line-height:1;flex:none;width:1.3em;text-shadow:0 0 18px rgba(244,197,106,.5)}
+.tile .body{min-width:0;flex:1}
+.tile .title{font-weight:700;font-size:1.02rem;display:block;line-height:1.4}
+.tile .title::after{content:" →";color:var(--accent)}
+.tile p{margin:6px 0 0;color:var(--fg-muted);font-size:.86rem;line-height:1.65}
+.tile .tag{display:inline-block;font-size:.68rem;letter-spacing:.1em;padding:1px 8px;border-radius:999px;border:1px solid var(--line-strong);color:var(--fg-muted);margin-left:8px;vertical-align:middle}
+.tile.act{border-color:rgba(244,197,106,.45);background:linear-gradient(135deg,rgba(244,197,106,.16),rgba(16,24,42,.7))}
+.tile.act .tag{background:var(--accent);color:#1a1405;border-color:transparent}
+
+/* notices */
+.notes{display:flex;flex-direction:column;gap:10px}
+.note{background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
+.note summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:5px 1fr auto;gap:0 16px;align-items:center;padding:0 18px 0 0}
+.note summary::-webkit-details-marker{display:none}
+.note .stripe{align-self:stretch;background:var(--fg-dim)}
+.crit .stripe{background:var(--crit);box-shadow:0 0 14px var(--crit)} .warn .stripe{background:var(--warn);box-shadow:0 0 14px var(--warn)} .ok .stripe{background:var(--ok)} .info .stripe{background:var(--info)}
+.note .head{padding:14px 0;font-weight:700;line-height:1.5;min-width:0}
+.note .pill{display:inline-block;font-size:.68rem;letter-spacing:.1em;padding:2px 9px;border-radius:999px;margin-right:8px;vertical-align:middle;font-weight:700}
+.crit .pill{background:var(--crit-soft);color:var(--crit)} .warn .pill{background:var(--warn-soft);color:var(--warn)} .ok .pill{background:var(--ok-soft);color:var(--ok)} .info .pill{background:var(--info-soft);color:var(--info)} .plain .pill{background:rgba(255,255,255,.08);color:var(--fg-muted)}
+.note .date{color:var(--fg-dim);font-size:.76rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.note .date::after{content:" ＋";color:var(--accent)}
+.note[open] .date::after{content:" －"}
+.note .text{padding:0 18px 14px 21px;color:var(--fg-muted);font-size:.9rem;line-height:1.7}
+.note .text b{color:var(--fg)}
+.note .text a{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+.note .links{padding:0 18px 16px 21px;font-size:.88rem}
+.note .links a{color:var(--accent);border-bottom:1px solid rgba(244,197,106,.4)}
+.note .links a+a{margin-left:14px}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;background:rgba(255,255,255,.1);padding:1px 7px;border-radius:5px}
+.archive{font-size:.86rem;color:var(--fg-muted);margin-top:12px}
+.archive a{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+
+/* staff cards */
+.staff{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.card{background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:16px 20px;min-width:0;transition:border-color .25s,transform .25s}
+.card:hover{border-color:var(--line-strong);transform:translateY(-2px)}
+.card .title{font-weight:700;display:block;font-size:1rem}
+.card .title::after{content:" →";color:var(--accent)}
+.card .meta{font-size:.74rem;color:var(--fg-dim);letter-spacing:.06em}
+.card .meta a{color:var(--accent-2)}
+.card p{margin:6px 0 0;color:var(--fg-muted);font-size:.86rem;line-height:1.65}
+
+/* lists */
+.list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0 28px}
+.list li{padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem;min-width:0}
+.list li a:hover{color:var(--accent)}
+.list li .k{display:inline-block;font-size:.66rem;letter-spacing:.1em;color:var(--fg-muted);border:1px solid var(--line-strong);padding:0 6px;border-radius:4px;margin-right:8px;vertical-align:middle}
+.index{background:var(--glass);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:0 20px}
+.index summary{cursor:pointer;padding:14px 0;font-weight:700;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.index summary::-webkit-details-marker{display:none}
+.index summary .hint{font-weight:400;font-size:.8rem;color:var(--fg-muted)}
+.index summary::after{content:"＋";color:var(--accent);font-size:1.2rem}
+.index[open] summary::after{content:"－"}
+.index .inner{padding-bottom:18px}
+footer{color:var(--fg-dim);font-size:.78rem;margin-top:40px;border-top:1px solid var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between}
+.lamp{display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:var(--fg-muted);background:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:inherit;font-size:.78rem}
+.lamp:hover{border-color:var(--accent);color:var(--fg)}
+.reveal{opacity:1;transform:none}
+@media (prefers-reduced-motion:no-preference){
+  .reveal{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+  .reveal:nth-child(2){animation-delay:.08s}.reveal:nth-child(3){animation-delay:.16s}.reveal:nth-child(4){animation-delay:.24s}.reveal:nth-child(5){animation-delay:.32s}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+}
+@media (max-width:480px){ .hero{min-height:52vh} .note summary{grid-template-columns:5px 1fr} .note .date{grid-column:2;padding-bottom:10px;margin-top:-8px} }
+</style>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow"><span class="dot"></span><span>ふくしま在宅クリニック ｜ 業務管理</span><span class="clock" id="clock">--:--</span><span id="today">—</span></div>
+    <h1 class="greet" id="greet">今日も、<em>家にいたい</em>を支える一日へ。</h1>
+    <p class="motto" id="motto" title="クリックで次のことば">往診は、医療を暮らしの側に届ける仕事。<small>今日のことば ─ クリックで次へ</small></p>
+    <div class="hero-actions">
+      <a class="cta" href="https://app.notion.com/p/378a3585d168813d88c0d824fab21e68">🏠 今日の司令塔を開く <span class="arrow">→</span></a>
+      <a class="ghost" href="https://app.notion.com/p/3b7a3585d1688113a74ef71035fe1a30">🙋 要対応だけ見る</a>
+      <a class="ghost" href="https://app.notion.com/p/b7f372e65817494a99f36705c5fe89cc">🗣️ 申し送りを書く</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>毎日つかう5つ <span class="sub">往診前に、この順で</span></h2>
+    <div class="five" id="five">
+      <div class="tile reveal"><div class="num">①</div><div class="body">
+        <a class="title" href="https://app.notion.com/p/b7f372e65817494a99f36705c5fe89cc">申し送りを見る・書く</a>
+        <p>気づいたこと・連絡事項はここへ。LINEで送った報告も自動で入ります。「📋 スタッフ用」ビューが見やすいです。</p></div></div>
+      <div class="tile reveal"><div class="num">②</div><div class="body">
+        <a class="title" href="https://app.notion.com/p/de76e9e4d7094cadba86aab178f5bcbf">患者情報をしらべる</a>
+        <p>病名・要介護度・当月サマリ・連絡先・ケアマネ・詳細アセスメント。「👤 スタッフ用一覧」ビューが見やすいです。</p></div></div>
+      <div class="tile reveal"><div class="num">③</div><div class="body">
+        <a class="title" href="https://app.notion.com/p/378a3585d16881118d17c9907e48b860">文書の期限をみる</a>
+        <p>在宅療養計画書・訪問看護指示書の期限が近い患者の一覧。</p></div></div>
+      <div class="tile reveal"><div class="num">④</div><div class="body">
+        <a class="title" href="https://app.notion.com/p/39aa3585d16881babb7acef2064acdda">病名・文書料・算定 点検結果</a><span class="tag">読むページ</span>
+        <p>病名⇔算定突合（毎日19:00）・文書系加算（毎週月曜20:00）・月次レセプト前点検（毎月25日21:00）。対応は⑤で行います。</p></div></div>
+      <div class="tile act reveal"><div class="num">⑤</div><div class="body">
+        <a class="title" href="https://app.notion.com/p/3b7a3585d1688113a74ef71035fe1a30">本日の事務処理 要対応項目</a><span class="tag">要対応</span>
+        <p>自動タスクが<b>明示的に人の対応を依頼した項目だけ</b>の一覧。対応が終わったら「要対応」のチェックを外してください。</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>お知らせ <span class="sub">対応が必要なものが上 ─ 見出しをクリックで開く</span></h2>
+    <div class="notes">
+      <details class="note crit" open>
+        <summary><span class="stripe"></span><span class="head"><span class="pill">要対応・10/10 提出前</span>9月診療分のレセプト点検結果 ─ 必須修正 21件</span><span class="date">2026/10/06〜</span></summary>
+        <div class="text">最終版のレセ電（145名）を点検しました。事務の方は <b>A（必須修正）21件</b> の修正をお願いします。今月からレセスタの代わりにAIが点検しています（レセスタ最終回の結果とも全行突き合わせ済み）。</div>
+        <div class="links"><a href="https://app.notion.com/p/3efa3585d16881ae935bd3c8f63c0fcb">点検レポート</a><a href="https://app.notion.com/p/3f1a3585d168816fb017d40586053271">レセスタとの突き合わせ</a></div>
+      </details>
+      <details class="note warn" open>
+        <summary><span class="stripe"></span><span class="head"><span class="pill">要対応</span>インフルエンザ予防接種の「希望の有無」を確認してください</span><span class="date">2026/09/13〜</span></summary>
+        <div class="text">訪問前に <a href="https://app.notion.com/p/de76e9e4d7094cadba86aab178f5bcbf?v=3daa3585d16881d7a79a000c777aa735"><b>未確認・返答待ちの一覧</b></a> を開き、往診時に希望を聞いて、マスターで選ぶかLINEで報告してください。口頭だけで確認した分はマスターへの手入力をお願いします。</div>
+        <div class="links"><a href="https://app.notion.com/p/3daa3585d16881cb9d77c3be78395fbb">記録方法とほかのビュー</a></div>
+      </details>
+      <details class="note ok">
+        <summary><span class="stripe"></span><span class="head"><span class="pill">使える</span>往診報告・LINE返信のAI下書き ─ そのまま送れる文面が15分以内に届きます</span><span class="date">2026/09/13 更新</span></summary>
+        <div class="text">公式LINEに往診記録の写真を送ってから <code>往診報告 ○○様</code>、返信は <code>返信案 患者名</code>。AIがLINEに送信することはありません。送るのは必ず人です。</div>
+        <div class="links"><a href="https://app.notion.com/p/3cca3585d1688155b999e1b0b1c905f3">使い方と下書きの例</a></div>
+      </details>
+      <details class="note plain">
+        <summary><span class="stripe"></span><span class="head"><span class="pill">困ったら</span>「OWELが重い・固まる」は Chrome の設定1か所で直ります（1分）</span><span class="date">2026/09/09〜</span></summary>
+        <div class="text">Chrome の同期設定で「履歴」と「開いているタブ」をオフにします。</div>
+        <div class="links"><a href="https://app.notion.com/p/3d6a3585d16881c09e67ed147a71a50c">原因と直し方</a></div>
+      </details>
+      <details class="note info">
+        <summary><span class="stripe"></span><span class="head"><span class="pill">算定</span>在宅医療DX情報活用加算（11点・月1回）─ 届出済みのため、算定の可否をご検討ください</span><span class="date">2026/09/06〜</span></summary>
+        <div class="links"><a href="https://app.notion.com/p/3d3a3585d1688155b731e8e0ea1def85">算定要件まとめ</a></div>
+      </details>
+    </div>
+    <p class="archive">📢 <a href="https://app.notion.com/p/3f1a3585d16881a1a636c4ed7df51ccc">お知らせ（全文とアーカイブ）</a></p>
+  </section>
+
+  <section>
+    <h2>スタッフ向け</h2>
+    <div class="staff">
+      <div class="card"><a class="title" href="https://app.notion.com/p/3db9ae50d1b48149b928f99d96469f70">🧑‍⚕️ スタッフページ</a><p>思いついたこと・気になることを自由に書けるページです。何でもClaudeが形にします。</p></div>
+      <div class="card"><a class="title" href="https://app.notion.com/p/3df9ae50d1b481319377c2f7e129ea62">📘 はじめてのCowork（AI活用ガイド）</a><p>「○○さんの訪看指示書を作って」と、いつもの言い方で打つだけで下書きが数分で出てきます。読むだけなら10分、最初の1つを試すのは3分。</p></div>
+      <div class="card"><a class="title" href="https://app.notion.com/p/3cc9ae50d1b481a589b6f5d3f09eba91">💡 AI業務改善 提案ボード</a><p>「ここが面倒」「これ直してほしい」を一言だけ書けばOK。書かれた内容は業務管理AIが読みます。</p></div>
+      <div class="card"><a class="title" href="https://app.notion.com/p/3db9ae50d1b4815ca7b3ea7cfa466f7d">🌅 週の掲示板</a> <span class="meta">毎週月曜 8:00 自動更新</span><p>2026年度改定の変更点／加算と助成金／症例で考える／在支診からの発展／今週の動き の5本。常に最新の1枚だけを表示します。</p></div>
+      <div class="card"><a class="title" href="https://app.notion.com/p/3db9ae50d1b4812cbc43c6db0221c940">📚 在宅医療 1年カリキュラム</a> <span class="meta">｜ <a href="https://app.notion.com/p/b34d18470e284178a85e3ce0205cfcd6">🗂 学習ログ</a></span><p>カリキュラムは在宅医療を体系的に学ぶための参考資料です。学習ログには掲示板で配信されたテーマが1行ずつ溜まります。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>使い方ガイド <span class="sub">最初に1回だけ読めばOK</span></h2>
+    <ul class="list">
+      <li><a href="https://app.notion.com/p/363a3585d168816eb7f6d312a66290df">患者申し送りDB 運用ガイド</a></li>
+      <li><a href="https://app.notion.com/p/371a3585d16881f9a5f5e60bbc7f6da1">LINE→患者申し送り 連携セットアップ手順</a></li>
+      <li><a href="https://app.notion.com/p/378a3585d168814699c4c809d77e4c71">📄 患者アセスメント テンプレート</a></li>
+    </ul>
+  </section>
+
+  <section>
+    <details class="index">
+      <summary>🗂 ページとデータベースの本体 <span class="hint">通常は上のリンクから開けばOK</span></summary>
+      <div class="inner">
+        <h3>診療・事務で使うもの</h3>
+        <ul class="list">
+          <li><a href="https://app.notion.com/p/378a3585d168813d88c0d824fab21e68">🏠 今日の司令塔（ダッシュボード）</a></li>
+          <li><a href="https://app.notion.com/p/378a3585d16881118d17c9907e48b860">文書期限アラート</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/b7f372e65817494a99f36705c5fe89cc">患者申し送り</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/de76e9e4d7094cadba86aab178f5bcbf">在宅患者文書マスター</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/2eca4115ba63450ab67fd0029fd31969">月次サマリー</a></li>
+          <li><a href="https://app.notion.com/p/39aa3585d16881babb7acef2064acdda">病名・文書料・レセプト関連点検レポート</a></li>
+          <li><a href="https://app.notion.com/p/3b7a3585d1688113a74ef71035fe1a30">要対応（AIからの申し送り）</a></li>
+          <li><a href="https://app.notion.com/p/3cca3585d1688155b999e1b0b1c905f3">LINE返信と往診報告の下書きをAIに頼む</a></li>
+          <li><a href="https://app.notion.com/p/3d6a3585d16881c09e67ed147a71a50c">🐢 OWELが遅い・固まるときの原因と直し方</a></li>
+          <li><a href="https://app.notion.com/p/3daa3585d16881cb9d77c3be78395fbb">💉 インフルエンザ予防接種 希望確認の記録方法</a></li>
+          <li><a href="https://app.notion.com/p/3d7a3585d1688130acfccbeead7b60c7">【日程調整のお願い】GSK ランチョンセミナー（重症喘息）</a></li>
+        </ul>
+        <h3>AIの運用・管理用</h3>
+        <ul class="list">
+          <li><a href="https://app.notion.com/p/37ca3585d1688171aec4eb5bb8cc8bf0">🌙 往診ブリーフィング下書き（夜間収集）</a></li>
+          <li><a href="https://app.notion.com/p/3e2a3585d1688191accad5e9ece2e6c2">🌙🌙 往診ブリーフィング下書き（翌々日分）</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/1ec914dc16be42fabb437e1fb3368dd4">AI改善提案</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/514bb9ca3cc048ed877c9f971a6e1207">AIタスク実行ログ</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/e76cd086046c46c68559b702c5e6b82b">AI共有ナレッジ</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/08247e018255442d85c0789221cd260f">アセスメント討議（foresight PC1×PC2）</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/79a2810ec4684451a2912337f0f88259">スキル同期ボード（組織A⇄組織B 連絡帳）</a></li>
+          <li><span class="k">DB</span><a href="https://app.notion.com/p/6b612298bb5c47d79e691eccc43d83e1">🗣 対話指示案件（権限拒否・対話セッション実行待ち）</a></li>
+          <li><a href="https://app.notion.com/p/3e1a3585d16881d8b48ed9cecacef9e0">📚 ナレッジ必読ダイジェスト（タグ別）</a></li>
+          <li><a href="https://app.notion.com/p/3e1a3585d16881628885e9e81f0afe29">🚦 AI規律ダッシュボード（手順0の遵守状況）</a></li>
+          <li><a href="https://app.notion.com/p/3e2a3585d168813493cdde65bbab9b05">🎓 ナレッジ卒業 仕分け表（2026-09-22）</a></li>
+          <li><a href="https://app.notion.com/p/3d3a3585d16881519f46f881559d4a12">Custom Agent設計_月次サマリー整形係</a></li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    <span>ふくしま在宅クリニック 業務管理 ─ 城東区の空は、いまの時刻にあわせて変わります。</span>
+    <button class="lamp" id="lamp" type="button">🏮 街の灯りを増やす</button>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── clock / greeting ── */
+  var days=['日','月','火','水','木','金','土'];
+  var greetEl=document.getElementById('greet'), clockEl=document.getElementById('clock'), todayEl=document.getElementById('today');
+  function tick(){
+    var d=new Date(), h=d.getHours();
+    clockEl.textContent=String(h).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    todayEl.textContent=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日（'+days[d.getDay()]+'）';
+    var g;
+    if(h<5) g='夜おそくまで、<em>ありがとうございます</em>。';
+    else if(h<10) g='おはようございます。今日も、<em>家にいたい</em>を支える一日へ。';
+    else if(h<15) g='こんにちは。午後の訪問も、<em>よく見て、よく聴いて</em>。';
+    else if(h<19) g='お疲れさまです。<em>今日の記録</em>が、明日の安心になります。';
+    else g='お疲れさまでした。街の灯りの数だけ、<em>今日の物語</em>がありました。';
+    if(greetEl.dataset.g!==g){ greetEl.innerHTML=g; greetEl.dataset.g=g; }
+  }
+  tick(); setInterval(tick,15000);
+
+  /* ── motto rotation ── */
+  var mottos=[
+    '往診は、医療を暮らしの側に届ける仕事。',
+    '一軒一軒の灯りの向こうに、ひとつずつ物語がある。',
+    '小さな気づきが、明日の安心をつくる。',
+    'よく見て、よく聴いて、よく記録する。それが最良の医療になる。',
+    '今日の一件が、城東区のだれかの一年を変えるかもしれない。',
+    '治すことだけが医療ではない。そばにいることも、医療。',
+    '迷ったら、患者さんの「いちばん大切なこと」に戻る。'
+  ];
+  var mi=new Date().getDate()%mottos.length, mottoEl=document.getElementById('motto');
+  function setMotto(){ mottoEl.innerHTML=mottos[mi]+'<small>今日のことば ─ クリックで次へ</small>'; }
+  setMotto();
+  mottoEl.addEventListener('click',function(){ mi=(mi+1)%mottos.length; if(reduce){setMotto();return;} mottoEl.classList.add('swap'); setTimeout(function(){setMotto();mottoEl.classList.remove('swap');},320); });
+
+  /* ── tile tilt ── */
+  if(!reduce && window.matchMedia('(hover:hover)').matches){
+    document.querySelectorAll('.tile').forEach(function(t){
+      t.addEventListener('mousemove',function(e){
+        var r=t.getBoundingClientRect(), x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+        t.style.setProperty('--mx',(x*100)+'%'); t.style.setProperty('--my',(y*100)+'%');
+        t.style.transform='rotateX('+((0.5-y)*6)+'deg) rotateY('+((x-0.5)*8)+'deg) translateZ(4px)';
+      });
+      t.addEventListener('mouseleave',function(){ t.style.transform=''; });
+    });
+  }
+
+  /* ── living sky ── */
+  var cv=document.getElementById('sky'), ctx=cv.getContext('2d'), W,H,DPR;
+  var stars=[], houses=[], lanterns=[], mouse={x:-1e4,y:-1e4}, extraLamps=0;
+  function lerp(a,b,t){return a+(b-a)*t}
+  function mix(c1,c2,t){return [lerp(c1[0],c2[0],t),lerp(c1[1],c2[1],t),lerp(c1[2],c2[2],t)]}
+  function rgb(c){return 'rgb('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+')'}
+  /* sky keyframes by hour: [top, horizon] */
+  var keys=[
+    [0, [8,12,30],[22,26,58]],
+    [5, [20,24,70],[200,110,90]],
+    [7, [90,150,220],[250,200,140]],
+    [12,[70,140,230],[180,215,245]],
+    [17,[60,80,160],[245,150,90]],
+    [19,[20,22,70],[120,60,90]],
+    [21,[8,12,32],[30,30,70]],
+    [24,[8,12,30],[22,26,58]]
+  ];
+  function skyAt(hour){
+    for(var i=0;i<keys.length-1;i++){ if(hour>=keys[i][0]&&hour<=keys[i+1][0]){ var t=(hour-keys[i][0])/(keys[i+1][0]-keys[i][0]); return [mix(keys[i][1],keys[i+1][1],t),mix(keys[i][2],keys[i+1][2],t)]; } }
+    return [keys[0][1],keys[0][2]];
+  }
+  function build(){
+    DPR=Math.min(window.devicePixelRatio||1,2); W=innerWidth; H=innerHeight;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+    stars=[]; for(var i=0;i<160;i++) stars.push({x:Math.random()*W,y:Math.random()*H*0.7,r:Math.random()*1.3+.3,p:Math.random()*6.28});
+    houses=[]; var x=0, base=H;
+    while(x<W+40){
+      var w=28+Math.random()*50, h=30+Math.random()*(60+ (Math.random()<.18?110:0));
+      var hs={x:x,w:w,h:h,wins:[]};
+      var cols=Math.max(1,Math.floor((w-10)/12)), rows=Math.max(1,Math.floor((h-12)/14));
+      for(var c=0;c<cols;c++)for(var r=0;r<rows;r++){ if(Math.random()<.55) hs.wins.push({x:x+6+c*12,y:base-h+8+r*14,on:Math.random()<.5,ph:Math.random()*6.28,sp:.2+Math.random()*.6}); }
+      houses.push(hs); x+=w+3+Math.random()*8;
+    }
+    lanterns=[]; for(var j=0;j<18;j++) lanterns.push(newLantern(true));
+  }
+  function newLantern(init){ return {x:Math.random()*W,y:init?Math.random()*H:H+20,vy:.15+Math.random()*.35,vx:(Math.random()-.5)*.15,r:1.5+Math.random()*2.2,a:.3+Math.random()*.5,ph:Math.random()*6.28}; }
+  var t0=performance.now();
+  function frame(now){
+    var t=(now-t0)/1000, d=new Date(), hour=d.getHours()+d.getMinutes()/60;
+    var sk=skyAt(hour), night=Math.max(0,Math.min(1,(hour<6?1:hour<8?(8-hour)/2:hour<17?0:hour<20?(hour-17)/3:1)));
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,rgb(sk[0])); g.addColorStop(1,rgb(sk[1]));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    /* stars */
+    if(night>0){ ctx.fillStyle='#fff'; stars.forEach(function(s){ var a=night*(0.4+0.6*Math.abs(Math.sin(t*.8+s.p))); ctx.globalAlpha=a*.9; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,6.28); ctx.fill(); }); ctx.globalAlpha=1; }
+    /* moon / sun */
+    var sunA=((hour-6)/12)*Math.PI; var cx=W*0.5+Math.cos(Math.PI-sunA)*W*0.42, cy=H*0.78-Math.sin(sunA)*H*0.6;
+    if(hour>5.5&&hour<18.5){ var rg=ctx.createRadialGradient(cx,cy,0,cx,cy,120); rg.addColorStop(0,'rgba(255,240,200,.9)'); rg.addColorStop(.2,'rgba(255,220,150,.5)'); rg.addColorStop(1,'rgba(255,200,120,0)'); ctx.fillStyle=rg; ctx.fillRect(cx-120,cy-120,240,240); }
+    else { var mx=W*0.78, my=H*0.18; var mg=ctx.createRadialGradient(mx,my,0,mx,my,90); mg.addColorStop(0,'rgba(255,250,230,.95)'); mg.addColorStop(.15,'rgba(255,250,230,.8)'); mg.addColorStop(.3,'rgba(220,225,255,.18)'); mg.addColorStop(1,'rgba(220,225,255,0)'); ctx.fillStyle=mg; ctx.fillRect(mx-90,my-90,180,180); }
+    /* distant haze */
+    var hz=ctx.createLinearGradient(0,H*0.55,0,H); hz.addColorStop(0,'rgba(0,0,0,0)'); hz.addColorStop(1,'rgba(5,8,20,'+(0.35+0.4*night)+')'); ctx.fillStyle=hz; ctx.fillRect(0,H*0.55,W,H*0.45);
+    /* rooftops */
+    var sil=mix([30,36,60],[10,12,26],night);
+    houses.forEach(function(hs){ ctx.fillStyle=rgb(sil); ctx.fillRect(hs.x,H-hs.h,hs.w,hs.h); });
+    /* windows: brighten near cursor; more lit at night */
+    houses.forEach(function(hs){ hs.wins.forEach(function(w){
+      var dx=w.x-mouse.x, dy=w.y-mouse.y, near=Math.max(0,1-Math.sqrt(dx*dx+dy*dy)/160);
+      var base=(w.on?0.35+0.45*night:0.08*night)+extraLamps*0.08*(w.ph%1);
+      var fl=0.85+0.15*Math.sin(t*w.sp*3+w.ph);
+      var a=Math.min(1,base*fl+near*0.9);
+      if(a<0.03) return;
+      ctx.fillStyle='rgba(255,205,120,'+a+')'; ctx.fillRect(w.x,w.y,7,9);
+      if(near>0.2){ ctx.fillStyle='rgba(255,205,120,'+(near*0.25)+')'; ctx.fillRect(w.x-4,w.y-4,15,17); }
+    }); });
+    /* lanterns rising */
+    lanterns.forEach(function(l,i){
+      l.y-=l.vy; l.x+=l.vx+Math.sin(t+l.ph)*.12; if(l.y<-20) lanterns[i]=newLantern(false);
+      var a=l.a*(0.5+0.5*Math.sin(t*1.5+l.ph))*(0.4+0.6*night);
+      ctx.fillStyle='rgba(255,215,140,'+a+')'; ctx.beginPath(); ctx.arc(l.x,l.y,l.r,0,6.28); ctx.fill();
+      ctx.fillStyle='rgba(255,215,140,'+(a*.25)+')'; ctx.beginPath(); ctx.arc(l.x,l.y,l.r*3,0,6.28); ctx.fill();
+    });
+    if(!reduce) requestAnimationFrame(frame);
+  }
+  build(); window.addEventListener('resize',build);
+  window.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY;},{passive:true});
+  window.addEventListener('touchmove',function(e){var p=e.touches[0]; if(p){mouse.x=p.clientX;mouse.y=p.clientY;}},{passive:true});
+  document.getElementById('lamp').addEventListener('click',function(){
+    extraLamps=Math.min(6,extraLamps+1);
+    houses.forEach(function(hs){ hs.wins.forEach(function(w){ if(!w.on&&Math.random()<.25) w.on=true; }); });
+    for(var j=0;j<10;j++) lanterns.push(newLantern(false));
+    this.textContent=extraLamps>=6?'🏮 街じゅうに灯りがともりました':'🏮 街の灯りを増やす（'+extraLamps+'）';
+    if(reduce) frame(performance.now());
+  });
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
